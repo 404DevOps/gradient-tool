@@ -1,0 +1,17 @@
+{
+  "name": "gradient-texture-tool-desktop",
+  "version": "1.0.0",
+  "description": "Standalone desktop wrapper for the Gradient Texture Tool, built with Neutralino.",
+  "private": true,
+  "scripts": {
+    "sync": "node sync-resources.js",
+    "start": "npm run sync && neu run",
+    "build": "npm run sync && neu build && node copy-dist.js",
+    "update": "neu update"
+  },
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@neutralinojs/neu": "^11.7.2"
+  }
+}

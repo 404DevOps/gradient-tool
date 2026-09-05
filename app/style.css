@@ -1,0 +1,640 @@
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* Pin the fill/thumb color so it can't shift on hover (browsers otherwise
+   tint the native range track differently on hover/active in some themes) —
+   clicking anywhere on the track still jumps to that value, unaffected. */
+input[type="range"] {
+  accent-color: #4a7dfc;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: #1e1e1e;
+  color: #eee;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.top-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  padding: 12px 20px;
+  background: #262626;
+  border-bottom: 1px solid #3a3a3a;
+  flex-wrap: wrap;
+}
+
+.top-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.top-controls select {
+  font-size: 14px;
+  padding: 5px 8px;
+  background: #333;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 4px;
+}
+
+.top-controls button {
+  padding: 9px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+  border-radius: 4px;
+  background: #4a7dfc;
+  color: white;
+}
+
+.top-controls button:hover {
+  background: #3a6aeb;
+}
+
+#download {
+  margin-left: auto;
+  background: #2fa84f;
+}
+
+#download:hover {
+  background: #278f43;
+}
+
+.panels {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.preview-panel {
+  flex: 0 0 auto;
+  width: 42%;
+  min-width: 280px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.preview-container {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
+  background-image:
+    linear-gradient(45deg, #444 25%, transparent 25%),
+    linear-gradient(-45deg, #444 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #444 75%),
+    linear-gradient(-45deg, transparent 75%, #444 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  background-color: #333;
+  flex: 0 0 auto;
+}
+
+#preview-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.panel-divider {
+  flex: 0 0 6px;
+  align-self: stretch;
+  cursor: col-resize;
+  background: #2a2a2a;
+  border-left: 1px solid #3a3a3a;
+  border-right: 1px solid #3a3a3a;
+  touch-action: none;
+}
+
+.panel-divider:hover,
+.panel-divider.dragging {
+  background: #4a7dfc;
+  border-color: #4a7dfc;
+}
+
+.spinner-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.spinner-overlay::after {
+  content: "";
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.preview-note {
+  font-size: 12px;
+  color: #999;
+  max-width: 512px;
+  text-align: center;
+  margin: 0;
+}
+
+.gradient-panel {
+  flex: 1;
+  min-width: 340px;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+#gradient-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gradient-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #2a2a2a;
+  border: 1px solid #383838;
+  border-radius: 6px;
+}
+
+.drag-handle {
+  cursor: grab;
+  font-size: 16px;
+  color: #888;
+  user-select: none;
+  padding: 0 2px;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.color-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.color-swatch {
+  width: 36px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.color-swatch:hover {
+  border-color: #666;
+}
+
+.color-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 10px;
+  width: 210px;
+  background: #333;
+  border: 1px solid #444;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.hue-strip {
+  position: relative;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid #222;
+  cursor: pointer;
+  touch-action: none;
+  background: linear-gradient(
+    to right,
+    hsl(0, 100%, 50%),
+    hsl(60, 100%, 50%),
+    hsl(120, 100%, 50%),
+    hsl(180, 100%, 50%),
+    hsl(240, 100%, 50%),
+    hsl(300, 100%, 50%),
+    hsl(360, 100%, 50%)
+  );
+}
+
+.hue-strip-indicator {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+  transform: translateX(-1px);
+  pointer-events: none;
+}
+
+.segmented-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.segmented-tabs button {
+  flex: 1;
+  border: 1px solid #444;
+  background: #2a2a2a;
+  color: #aaa;
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.segmented-tabs button:hover {
+  color: #eee;
+}
+
+.segmented-tabs button.active {
+  background: #4a7dfc;
+  border-color: #4a7dfc;
+  color: #fff;
+}
+
+.color-mode-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sv-square {
+  position: relative;
+  height: 130px;
+  border-radius: 4px;
+  border: 1px solid #222;
+  cursor: crosshair;
+  touch-action: none;
+  background-image:
+    linear-gradient(to top, #000, transparent),
+    linear-gradient(to right, #fff, transparent);
+}
+
+.sv-square-marker {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.hsl-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hsl-row-label {
+  flex: 0 0 auto;
+  width: 12px;
+  font-size: 11px;
+  color: #aaa;
+}
+
+.hsl-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.hsl-row-value {
+  flex: 0 0 auto;
+  width: 34px;
+  text-align: right;
+  font-size: 11px;
+  color: #ccc;
+  font-variant-numeric: tabular-nums;
+}
+
+.hex-row {
+  padding-bottom: 4px;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.hex-input {
+  flex: 1;
+  min-width: 0;
+  background: #222;
+  border: 1px solid #444;
+  color: #eee;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.copy-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 0 0 auto;
+}
+
+.copy-btn {
+  width: 22px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid #444;
+  background: #333;
+  color: #aaa;
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.copy-btn:hover {
+  background: #3d3d3d;
+  color: #eee;
+}
+
+.fade-width {
+  flex: 1;
+  min-width: 50px;
+}
+
+.fade-value {
+  font-size: 12px;
+  color: #aaa;
+  width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.remove-btn {
+  border: none;
+  background: #5a2a2a;
+  color: #f5b5b5;
+  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  line-height: 1;
+  cursor: pointer;
+  font-size: 14px;
+  flex: 0 0 auto;
+}
+
+.remove-btn:hover {
+  background: #7a3a3a;
+}
+
+.empty-state {
+  color: #888;
+  font-size: 14px;
+  text-align: center;
+  margin-top: 40px;
+}
+
+.add-gradient-btn {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  border: none;
+  border-radius: 6px;
+  background: #4a7dfc;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.add-gradient-btn:hover {
+  background: #3a6aeb;
+}
+
+.sortable-ghost {
+  opacity: 0.4;
+}
+
+.sortable-chosen .drag-handle {
+  color: #4a7dfc;
+}
+
+dialog#import-dialog,
+dialog#analyze-dialog {
+  border: none;
+  border-radius: 10px;
+  padding: 0;
+  background: #262626;
+  color: #eee;
+  width: min(480px, 90vw);
+}
+
+dialog#import-dialog::backdrop,
+dialog#analyze-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+}
+
+.dialog-form h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.import-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #999;
+}
+
+#import-textarea {
+  width: 100%;
+  resize: vertical;
+  background: #1e1e1e;
+  color: #eee;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 8px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.import-darken-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.import-darken-label input[type="range"] {
+  flex: 1;
+}
+
+.analyze-image-preview-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+#analyze-image-canvas {
+  max-width: 100%;
+  max-height: 260px;
+  width: auto;
+  height: auto;
+  border-radius: 6px;
+  border: 1px solid #444;
+}
+
+#analyze-image-canvas.pick-mode {
+  cursor: crosshair;
+}
+
+#analyze-file-input {
+  color: #ccc;
+  font-size: 12px;
+}
+
+.import-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.import-swatch-pair {
+  display: flex;
+  padding: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #444;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.import-swatch-pair:not(.removable):hover {
+  border-color: #666;
+}
+
+.import-swatch-pair.excluded {
+  opacity: 0.25;
+  filter: grayscale(60%);
+}
+
+.import-swatch-pair.removable {
+  cursor: default;
+}
+
+.import-swatch {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.swatch-remove-btn {
+  width: 16px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: #3a2a2a;
+  color: #f5b5b5;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.swatch-remove-btn:hover {
+  background: #5a2a2a;
+}
+
+.regenerate-btn {
+  border: 1px solid #444;
+  background: #333;
+  color: #ccc;
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 4px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.regenerate-btn:hover {
+  background: #3d3d3d;
+  color: #eee;
+}
+
+.import-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.import-actions button {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.dialog-cancel-btn {
+  background: #3a3a3a;
+  color: #eee;
+}
+
+.dialog-confirm-btn {
+  background: #4a7dfc;
+  color: white;
+}
+
+.dialog-confirm-btn:disabled {
+  background: #3a3a3a;
+  color: #777;
+  cursor: not-allowed;
+}
