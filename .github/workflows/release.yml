@@ -1,0 +1,50 @@
+name: Build and attach release executables
+
+# Fires when you publish a GitHub Release (create one from a tag, or promote
+# a draft) — builds the desktop app and attaches platform zips to that release.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install desktop-app dependencies
+        working-directory: desktop-app
+        run: npm ci
+
+      - name: Download Neutralino runtime binaries
+        working-directory: desktop-app
+        run: npm run update
+
+      - name: Build app (produces binaries for every platform in one pass)
+        working-directory: desktop-app
+        run: npm run build
+
+      - name: Package release archives
+        working-directory: desktop-app/dist/GradientTextureTool
+        run: |
+          chmod +x GradientTextureTool-mac_universal GradientTextureTool-linux_x64
+          zip -j ../../../GradientTextureTool-windows.zip GradientTextureTool-win_x64.exe resources.neu
+          zip -j ../../../GradientTextureTool-macos.zip GradientTextureTool-mac_universal resources.neu
+          zip -j ../../../GradientTextureTool-linux.zip GradientTextureTool-linux_x64 resources.neu
+
+      - name: Attach archives to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            GradientTextureTool-windows.zip
+            GradientTextureTool-macos.zip
+            GradientTextureTool-linux.zip
