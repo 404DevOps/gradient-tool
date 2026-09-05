@@ -2,9 +2,12 @@ name: Build and attach release executables
 
 # Fires when you publish a GitHub Release (create one from a tag, or promote
 # a draft) — builds the desktop app and attaches platform zips to that release.
+# Can also be run manually (Actions tab -> Run workflow), in which case it
+# attaches the build to whatever the *latest* published release currently is.
 on:
   release:
     types: [published]
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -15,6 +18,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Determine target release tag
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            latest_tag=$(gh release view --repo "${{ github.repository }}" --json tagName -q .tagName)
+            echo "tag=$latest_tag" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -44,6 +59,7 @@ jobs:
       - name: Attach archives to the release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.target.outputs.tag }}
           files: |
             GradientTextureTool-windows.zip
             GradientTextureTool-macos.zip

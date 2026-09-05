@@ -4,7 +4,7 @@
   "description": "Standalone desktop wrapper for the Gradient Texture Tool, built with Neutralino.",
   "private": true,
   "scripts": {
-    "sync": "node sync-resources.js",
+    "sync": "node sync-resources.js && node generate-icon.js",
     "start": "npm run sync && neu run",
     "build": "npm run sync && neu build && node copy-dist.js",
     "update": "neu update"
