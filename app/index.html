@@ -30,6 +30,9 @@
       </label>
       <button id="import-palette" type="button">Import palette</button>
       <button id="analyze-image" type="button">Create from Image</button>
+      <button id="open-library" type="button">Palette Library</button>
+      <button id="open-match-colors" type="button" title="Add at least 2 gradients first" disabled>Match Colors</button>
+      <button id="clear-gradients" type="button" class="clear-btn" disabled>Clear All</button>
       <button id="download" type="button">Save as...</button>
     </header>
 
@@ -136,6 +139,107 @@
       <div class="import-actions">
         <button type="button" id="analyze-cancel" class="dialog-cancel-btn">Cancel</button>
         <button type="submit" id="analyze-confirm" class="dialog-confirm-btn" disabled>Import</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="library-dialog">
+    <form id="library-form" class="dialog-form library-form" method="dialog">
+      <h2>Palette Library</h2>
+      <p class="import-hint">
+        500 curated palettes — filter by mood, click one to preview it, then add it to
+        your gradients.
+      </p>
+
+      <div id="library-mood-filters" class="segmented-tabs wrap-tabs"></div>
+
+      <div id="library-grid" class="library-grid"></div>
+
+      <div id="library-picker-section" class="library-picker-section" hidden>
+        <label class="import-darken-label">
+          Lighten amount for start color
+          <input type="range" id="library-lighten" min="0" max="90" value="20" />
+          <span id="library-lighten-value">20%</span>
+        </label>
+
+        <label class="import-darken-label">
+          Darken amount for end color
+          <input type="range" id="library-darken" min="0" max="90" value="40" />
+          <span id="library-darken-value">40%</span>
+        </label>
+
+        <p class="import-hint">Click a swatch pair to exclude it from the import.</p>
+        <div id="library-preview" class="import-preview"></div>
+      </div>
+
+      <div class="import-actions">
+        <button type="button" id="library-cancel" class="dialog-cancel-btn">Close</button>
+        <button type="submit" id="library-confirm" class="dialog-confirm-btn" disabled>Add to gradients</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="match-colors-dialog">
+    <form id="match-colors-form" class="dialog-form" method="dialog">
+      <h2>Match Colors</h2>
+      <p class="import-hint">
+        Nudges your gradients' start colors so they work better as a set — spreads hues
+        apart, brings saturation in line, and spaces out lightness for contrast. End
+        colors are left as-is unless you turn on regeneration below.
+      </p>
+
+      <label class="import-darken-label">
+        Even out hues
+        <input type="range" id="match-hue" min="0" max="100" value="50" />
+        <span id="match-hue-value">50%</span>
+      </label>
+
+      <label class="import-darken-label">
+        Match saturation
+        <input type="range" id="match-saturation" min="0" max="100" value="50" />
+        <span id="match-saturation-value">50%</span>
+      </label>
+
+      <label class="import-darken-label">
+        Increase contrast
+        <input type="range" id="match-contrast" min="0" max="100" value="50" />
+        <span id="match-contrast-value">50%</span>
+      </label>
+
+      <label class="import-darken-label">
+        <input type="checkbox" id="match-regenerate-end" />
+        Regenerate end colors too
+      </label>
+
+      <label class="import-darken-label" id="match-darken-row" hidden>
+        Darken amount for end color
+        <input type="range" id="match-darken" min="0" max="90" value="40" />
+        <span id="match-darken-value">40%</span>
+      </label>
+
+      <div class="match-preview-row">
+        <span class="match-preview-label">Current</span>
+        <div id="match-preview-before" class="match-swatch-row"></div>
+      </div>
+      <div class="match-preview-row">
+        <span class="match-preview-label">Preview</span>
+        <div id="match-preview-after" class="match-swatch-row"></div>
+      </div>
+
+      <div class="import-actions">
+        <button type="button" id="match-cancel" class="dialog-cancel-btn">Cancel</button>
+        <button type="submit" id="match-apply" class="dialog-confirm-btn">Apply</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="clear-confirm-dialog">
+    <form id="clear-confirm-form" class="dialog-form" method="dialog">
+      <h2>Clear all gradients?</h2>
+      <p class="import-hint" id="clear-confirm-message">This can't be undone.</p>
+      <div class="import-actions">
+        <button type="button" id="clear-confirm-cancel" class="dialog-cancel-btn">Cancel</button>
+        <button type="submit" id="clear-confirm-ok" class="clear-btn dialog-confirm-btn">Clear All</button>
       </div>
     </form>
   </dialog>

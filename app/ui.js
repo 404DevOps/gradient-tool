@@ -5,6 +5,9 @@ import { createColorField } from './colorField.js';
 import { parsePalette } from './palette.js';
 import { darkenHex, lightenHex, rgbToHex } from './color.js';
 import { extractDominantColors } from './imageAnalysis.js';
+import { PALETTE_LIBRARY } from './paletteLibrary.js';
+import { classifyPaletteMoods } from './paletteMood.js';
+import { harmonizeColors } from './harmonize.js';
 
 const previewPanel = document.getElementById('preview-panel');
 const previewContainer = document.getElementById('preview-container');
@@ -53,6 +56,43 @@ const analyzeDarkenValue = document.getElementById('analyze-darken-value');
 const analyzePreview = document.getElementById('analyze-preview');
 const analyzeCancelBtn = document.getElementById('analyze-cancel');
 const analyzeConfirmBtn = document.getElementById('analyze-confirm');
+
+const openLibraryBtn = document.getElementById('open-library');
+const libraryDialog = document.getElementById('library-dialog');
+const libraryForm = document.getElementById('library-form');
+const libraryMoodFilters = document.getElementById('library-mood-filters');
+const libraryGrid = document.getElementById('library-grid');
+const libraryPickerSection = document.getElementById('library-picker-section');
+const libraryLighten = document.getElementById('library-lighten');
+const libraryLightenValue = document.getElementById('library-lighten-value');
+const libraryDarken = document.getElementById('library-darken');
+const libraryDarkenValue = document.getElementById('library-darken-value');
+const libraryPreview = document.getElementById('library-preview');
+const libraryCancelBtn = document.getElementById('library-cancel');
+const libraryConfirmBtn = document.getElementById('library-confirm');
+
+const openMatchColorsBtn = document.getElementById('open-match-colors');
+const matchColorsDialog = document.getElementById('match-colors-dialog');
+const matchColorsForm = document.getElementById('match-colors-form');
+const matchHue = document.getElementById('match-hue');
+const matchHueValue = document.getElementById('match-hue-value');
+const matchSaturation = document.getElementById('match-saturation');
+const matchSaturationValue = document.getElementById('match-saturation-value');
+const matchContrast = document.getElementById('match-contrast');
+const matchContrastValue = document.getElementById('match-contrast-value');
+const matchRegenerateEnd = document.getElementById('match-regenerate-end');
+const matchDarkenRow = document.getElementById('match-darken-row');
+const matchDarken = document.getElementById('match-darken');
+const matchDarkenValue = document.getElementById('match-darken-value');
+const matchPreviewBefore = document.getElementById('match-preview-before');
+const matchPreviewAfter = document.getElementById('match-preview-after');
+const matchCancelBtn = document.getElementById('match-cancel');
+
+const clearGradientsBtn = document.getElementById('clear-gradients');
+const clearConfirmDialog = document.getElementById('clear-confirm-dialog');
+const clearConfirmForm = document.getElementById('clear-confirm-form');
+const clearConfirmMessage = document.getElementById('clear-confirm-message');
+const clearConfirmCancelBtn = document.getElementById('clear-confirm-cancel');
 
 let renderQueued = false;
 
@@ -211,6 +251,8 @@ function renderGradientList() {
   for (const gradient of state.gradients) {
     gradientListEl.appendChild(buildGradientRow(gradient));
   }
+  openMatchColorsBtn.disabled = state.gradients.length < 2;
+  clearGradientsBtn.disabled = state.gradients.length === 0;
 }
 
 addGradientBtn.addEventListener('click', () => {
@@ -496,6 +538,222 @@ analyzeForm.addEventListener('submit', (e) => {
   renderGradientList();
   scheduleRender();
   analyzeDialog.close();
+});
+
+// Moods are computed once at load — the bundled dataset has no tags of its
+// own, so these are derived from each palette's actual colors (see
+// paletteMood.js).
+const paletteMoods = PALETTE_LIBRARY.map(classifyPaletteMoods);
+const allMoods = Array.from(new Set(paletteMoods.flat())).sort();
+
+let activeMoods = new Set();
+let selectedPaletteIndex = -1;
+
+const libraryPicker = createSwatchPicker({
+  container: libraryPreview,
+  confirmBtn: libraryConfirmBtn,
+  lightenInput: libraryLighten,
+  darkenInput: libraryDarken,
+});
+
+function renderMoodFilters() {
+  libraryMoodFilters.innerHTML = '';
+  for (const mood of allMoods) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = mood;
+    btn.classList.toggle('active', activeMoods.has(mood));
+    btn.addEventListener('click', () => {
+      if (activeMoods.has(mood)) activeMoods.delete(mood); else activeMoods.add(mood);
+      renderMoodFilters();
+      renderLibraryGrid();
+    });
+    libraryMoodFilters.appendChild(btn);
+  }
+}
+
+function selectPalette(index) {
+  selectedPaletteIndex = index;
+  renderLibraryGrid();
+  libraryPickerSection.hidden = false;
+  libraryPicker.setHexes(PALETTE_LIBRARY[index]);
+}
+
+function renderLibraryGrid() {
+  libraryGrid.innerHTML = '';
+  let shownCount = 0;
+  PALETTE_LIBRARY.forEach((palette, i) => {
+    if (activeMoods.size > 0 && !paletteMoods[i].some((m) => activeMoods.has(m))) return;
+    shownCount += 1;
+
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = i === selectedPaletteIndex ? 'library-palette-card selected' : 'library-palette-card';
+    card.title = paletteMoods[i].join(', ');
+    for (const hex of palette) {
+      const swatch = document.createElement('span');
+      swatch.style.background = hex;
+      card.appendChild(swatch);
+    }
+    card.addEventListener('click', () => selectPalette(i));
+    libraryGrid.appendChild(card);
+  });
+
+  if (shownCount === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'library-empty';
+    empty.textContent = 'No palettes match the selected moods.';
+    libraryGrid.appendChild(empty);
+  }
+}
+
+openLibraryBtn.addEventListener('click', () => {
+  activeMoods = new Set();
+  selectedPaletteIndex = -1;
+  libraryPickerSection.hidden = true;
+  libraryPicker.reset();
+  renderMoodFilters();
+  renderLibraryGrid();
+  libraryDialog.showModal();
+});
+
+libraryLighten.addEventListener('input', () => {
+  libraryLightenValue.textContent = `${libraryLighten.value}%`;
+  libraryPicker.rerender();
+});
+libraryDarken.addEventListener('input', () => {
+  libraryDarkenValue.textContent = `${libraryDarken.value}%`;
+  libraryPicker.rerender();
+});
+
+libraryCancelBtn.addEventListener('click', () => {
+  libraryDialog.close();
+});
+
+libraryForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  for (const { startColor, endColor } of libraryPicker.getIncludedColors()) {
+    state.gradients.push(createGradient({ startColor, endColor }));
+  }
+  renderGradientList();
+  scheduleRender();
+  libraryDialog.close();
+});
+
+function renderPairRow(container, pairs) {
+  container.innerHTML = '';
+  for (const { start, end } of pairs) {
+    const pair = document.createElement('div');
+    pair.className = 'match-pair';
+    const startSwatch = document.createElement('span');
+    startSwatch.style.background = start;
+    const endSwatch = document.createElement('span');
+    endSwatch.style.background = end;
+    pair.append(startSwatch, endSwatch);
+    container.appendChild(pair);
+  }
+}
+
+function currentMatchAmounts() {
+  return {
+    hueAmount: Number(matchHue.value) / 100,
+    saturationAmount: Number(matchSaturation.value) / 100,
+    contrastAmount: Number(matchContrast.value) / 100,
+  };
+}
+
+let matchPreviewResult = null;
+
+function updateMatchPreview() {
+  const startColors = state.gradients.map((g) => g.startColor);
+  const endColors = state.gradients.map((g) => g.endColor);
+  matchPreviewResult = harmonizeColors(startColors, currentMatchAmounts());
+
+  const regenerateEnd = matchRegenerateEnd.checked;
+  const darkenAmount = Number(matchDarken.value) / 100;
+
+  const currentPairs = startColors.map((start, i) => ({ start, end: endColors[i] }));
+  const previewPairs = matchPreviewResult.hexes.map((start, i) => ({
+    start,
+    end: regenerateEnd ? darkenHex(start, darkenAmount) : endColors[i],
+  }));
+
+  renderPairRow(matchPreviewBefore, currentPairs);
+  renderPairRow(matchPreviewAfter, previewPairs);
+}
+
+openMatchColorsBtn.addEventListener('click', () => {
+  matchHue.value = '50';
+  matchSaturation.value = '50';
+  matchContrast.value = '50';
+  matchHueValue.textContent = '50%';
+  matchSaturationValue.textContent = '50%';
+  matchContrastValue.textContent = '50%';
+  matchRegenerateEnd.checked = false;
+  matchDarkenRow.hidden = true;
+  matchDarken.value = '40';
+  matchDarkenValue.textContent = '40%';
+  updateMatchPreview();
+  matchColorsDialog.showModal();
+});
+
+[
+  [matchHue, matchHueValue],
+  [matchSaturation, matchSaturationValue],
+  [matchContrast, matchContrastValue],
+].forEach(([input, valueEl]) => {
+  input.addEventListener('input', () => {
+    valueEl.textContent = `${input.value}%`;
+    updateMatchPreview();
+  });
+});
+
+matchRegenerateEnd.addEventListener('change', () => {
+  matchDarkenRow.hidden = !matchRegenerateEnd.checked;
+  updateMatchPreview();
+});
+matchDarken.addEventListener('input', () => {
+  matchDarkenValue.textContent = `${matchDarken.value}%`;
+  updateMatchPreview();
+});
+
+matchCancelBtn.addEventListener('click', () => {
+  matchColorsDialog.close();
+});
+
+matchColorsForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (!matchPreviewResult) return;
+  const regenerateEnd = matchRegenerateEnd.checked;
+  const darkenAmount = Number(matchDarken.value) / 100;
+  state.gradients.forEach((gradient, i) => {
+    const newStart = matchPreviewResult.hexes[i];
+    gradient.startColor = newStart;
+    if (regenerateEnd) {
+      gradient.endColor = darkenHex(newStart, darkenAmount);
+    }
+  });
+  renderGradientList();
+  scheduleRender();
+  matchColorsDialog.close();
+});
+
+clearGradientsBtn.addEventListener('click', () => {
+  const count = state.gradients.length;
+  clearConfirmMessage.textContent = `This removes all ${count} gradient${count === 1 ? '' : 's'} from your list. This can't be undone.`;
+  clearConfirmDialog.showModal();
+});
+
+clearConfirmCancelBtn.addEventListener('click', () => {
+  clearConfirmDialog.close();
+});
+
+clearConfirmForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  state.gradients.length = 0;
+  renderGradientList();
+  scheduleRender();
+  clearConfirmDialog.close();
 });
 
 imageSizeSelect.value = String(state.imageSize);

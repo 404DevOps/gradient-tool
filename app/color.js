@@ -79,6 +79,13 @@ export function lightenHex(hex, amount = 0.2) {
   return hslToHex({ ...hsl, l: clamp(hsl.l + (100 - hsl.l) * amount, 0, 100) });
 }
 
+// rotateHueHex(hex, deltaDegrees) — shifts only the hue, keeping saturation
+// and lightness untouched.
+export function rotateHueHex(hex, deltaDegrees) {
+  const hsl = hexToHsl(hex);
+  return hslToHex({ ...hsl, h: (hsl.h + deltaDegrees + 360) % 360 });
+}
+
 export function rgbToHsv({ r, g, b }) {
   const rn = r / 255;
   const gn = g / 255;
