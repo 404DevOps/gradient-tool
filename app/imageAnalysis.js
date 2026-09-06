@@ -76,8 +76,26 @@ export function kmeans(pixels, k, iterations = 12) {
     .sort((a, b) => b.count - a.count);
 }
 
+// minSeparation(k) -> the minimum RGB distance two extracted colors must
+// have to both be kept, given that `k` colors were requested. Requesting
+// more colors relaxes this (asking for 32 shades implies you want fine
+// gradations that will naturally sit close together); requesting just a
+// couple tightens it (you want colors that read as clearly distinct).
+const MIN_REQUESTABLE = 2;
+const MAX_REQUESTABLE = 32;
+const SEPARATION_AT_MIN_K = 45;
+const SEPARATION_AT_MAX_K = 10;
+
+function minSeparation(k) {
+  const t = Math.min(1, Math.max(0, (k - MIN_REQUESTABLE) / (MAX_REQUESTABLE - MIN_REQUESTABLE)));
+  return SEPARATION_AT_MIN_K + (SEPARATION_AT_MAX_K - SEPARATION_AT_MIN_K) * t;
+}
+
 // extractDominantColors(imageData, k) -> string[] of "#rrggbb" hex colors,
-// most dominant first. imageData is a canvas ImageData (RGBA).
+// most dominant first. imageData is a canvas ImageData (RGBA). May return
+// fewer than k colors: clusters that fall within minSeparation(k) of an
+// already-kept, more-dominant color are dropped rather than exported as a
+// near-indistinguishable duplicate shade.
 export function extractDominantColors(imageData, k) {
   const { data, width, height } = imageData;
   const totalPixels = width * height;
@@ -92,7 +110,13 @@ export function extractDominantColors(imageData, k) {
   }
   if (pixels.length === 0) return [];
 
-  return kmeans(pixels, k).map(({ color }) => (
-    rgbToHex({ r: color[0], g: color[1], b: color[2] })
-  ));
+  const threshold2 = minSeparation(k) ** 2;
+  const kept = [];
+  for (const { color } of kmeans(pixels, k)) {
+    if (kept.every((c) => dist2(color, c) >= threshold2)) {
+      kept.push(color);
+    }
+  }
+
+  return kept.map((color) => rgbToHex({ r: color[0], g: color[1], b: color[2] }));
 }

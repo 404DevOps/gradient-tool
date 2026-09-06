@@ -31,7 +31,7 @@ export function composeTexture(canvas, state) {
   canvas.height = state.imageSize;
   const ctx = canvas.getContext('2d');
 
-  const rects = layoutStripes(state.gradients.length, state.imageSize, state.minStripeWidth);
+  const rects = layoutStripes(state.gradients.length, state.imageSize, state.gridX, state.gridY);
 
   state.gradients.forEach((gradientDef, i) => {
     renderGradientIntoRect(ctx, rects[i], gradientDef);

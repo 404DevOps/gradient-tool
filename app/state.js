@@ -2,7 +2,8 @@
 // Resets on page reload by design (no persistence).
 export const state = {
   imageSize: 1024,
-  minStripeWidth: 128,
+  gridX: 8,
+  gridY: 4,
   gradients: [],
 };
 

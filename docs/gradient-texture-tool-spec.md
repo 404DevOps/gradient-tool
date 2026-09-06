@@ -22,29 +22,33 @@ A static, client-side-only web app for generating multi-gradient stripe textures
 // App state (single object, no framework store needed)
 {
   imageSize: number,       // 512 | 1024 | 2048 | 4096
-  minStripeWidth: number,  // 32 | 64 | 128 | 256 | 512 (px)
+  gridX: number,           // number of columns
+  gridY: number,           // number of rows
   gradients: GradientDef[] // order matters — this is the display/render order
 }
 ```
 
 ## Layout algorithm (pure function, no side effects)
 
-`layoutStripes(count, imageSize, minStripeWidth) -> Rect[]`
+`layoutStripes(count, imageSize, gridX, gridY) -> Rect[]`
 
-Given `N = count` gradients:
+The grid is fixed by `imageSize`, `gridX`, and `gridY` alone — it does **not**
+depend on `count`. This is intentional: swapping colors on an existing
+gradient list (same count, same gridX/gridY) must always reproduce the exact
+same rects, so a recolored export drops in without any UV/material changes
+in Blender.
 
-1. `maxCols = max(1, floor(imageSize / minStripeWidth))`
-2. `rows = ceil(N / maxCols)`
-3. Distribute N as evenly as possible across `rows` rows:
-   - `base = floor(N / rows)`, `remainder = N % rows`
-   - The first `remainder` rows get `base + 1` items, the rest get `base` items.
-4. Each row has equal height: `rowHeight = imageSize / rows`.
-5. Within a row with `k` items, each stripe has equal width: `stripeWidth = imageSize / k` — stripes are stretched to fill the row exactly edge-to-edge, no gaps, no dangling space.
-6. Return an ordered array of `{x, y, width, height}` rects, one per gradient, in the same order as the gradients array (row-major: fill row 0 left-to-right, then row 1, etc).
+1. `cols = max(1, gridX)`, `rows = max(1, gridY)`.
+2. `cellWidth = imageSize / cols`, `cellHeight = imageSize / rows`.
+3. Fill cells row-major (row 0 left-to-right, then row 1, etc.) with the
+   first `min(count, cols × rows)` gradients — one rect per gradient, in
+   list order. Any gradients beyond `cols × rows` are not rendered; any
+   unfilled cells (when `count < cols × rows`) are left blank.
+4. Return an ordered array of `{x, y, width, height}` rects.
 
 This must be a pure function: same inputs always produce the same rects. No canvas/DOM access inside it — makes it trivially unit-testable.
 
-**Example:** 7 gradients, minStripeWidth makes maxCols = 4 → rows = ceil(7/4) = 2 → distribute 7 across 2 rows = [4, 3] → row 0 has 4 stripes each `imageSize/4` wide, row 1 has 3 stripes each `imageSize/3` wide. Both rows have height `imageSize/2`.
+**Example:** `imageSize = 1024`, `gridX = 4`, `gridY = 8` → 32 cells, each `256 × 128`. With 5 gradients defined, the first 4 fill row 0 and the 5th starts row 1 — regardless of how many gradients exist, cell 0 is always `{x:0, y:0, width:256, height:128}`.
 
 ## Gradient rendering (pure function)
 
@@ -63,13 +67,13 @@ This must be a pure function: same inputs always produce the same rects. No canv
 
 `composeTexture(canvas, state)`:
 1. Set `canvas.width = canvas.height = state.imageSize`.
-2. Call `layoutStripes(state.gradients.length, state.imageSize, state.minStripeWidth)`.
+2. Call `layoutStripes(state.gradients.length, state.imageSize, state.gridX, state.gridY)`.
 3. For each `(gradientDef, rect)` pair, call `renderGradientIntoRect`.
 4. This is the single full-resolution render — both the preview and the export draw from the *same* composer, just at different display scales.
 
 ## Live updates (revised — everything is live now)
 
-All edits update the preview immediately: color changes, fade slider drag, adding/removing a gradient, changing image size or min-stripe-width, **and drag-reorder** (previously reorder was going to be gated behind an "Apply" button — dropped that; canvas gradients are cheap even at 4096px, so there's no need to batch).
+All edits update the preview immediately: color changes, fade slider drag, adding/removing a gradient, changing image size or grid dimensions, **and drag-reorder** (previously reorder was going to be gated behind an "Apply" button — dropped that; canvas gradients are cheap even at 4096px, so there's no need to batch).
 
 - Debounce/throttle re-renders with `requestAnimationFrame` so a fast slider drag doesn't queue up redundant full-res renders — only render the latest state on each animation frame.
 - While a render is in flight (should be near-instant, but cover it anyway), show a small spinner overlay on the preview canvas. Simplest approach: a CSS spinner absolutely positioned over the preview container, toggled visible/hidden around the render call. Given renders are synchronous and fast, this will likely just flash briefly or not appear at all — that's fine, it's a safety net for slower machines/larger sizes, not a real async operation.

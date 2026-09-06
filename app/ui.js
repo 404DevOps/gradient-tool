@@ -1,6 +1,7 @@
 import { state, createGradient } from './state.js';
 import { composeTexture } from './render.js';
-import { downloadCanvasAsPng } from './export.js';
+import { canvasToBlob, saveBlob } from './export.js';
+import { injectTextChunk, extractTextChunk } from './pngMetadata.js';
 import { createColorField } from './colorField.js';
 import { parsePalette } from './palette.js';
 import { darkenHex, lightenHex, rgbToHex } from './color.js';
@@ -8,6 +9,8 @@ import { extractDominantColors } from './imageAnalysis.js';
 import { PALETTE_LIBRARY } from './paletteLibrary.js';
 import { classifyPaletteMoods } from './paletteMood.js';
 import { harmonizeColors } from './harmonize.js';
+
+const RECIPE_PNG_KEYWORD = 'gradient-recipe';
 
 const previewPanel = document.getElementById('preview-panel');
 const previewContainer = document.getElementById('preview-container');
@@ -19,8 +22,11 @@ const panelDivider = document.getElementById('panel-divider');
 const panelsEl = document.querySelector('.panels');
 const gradientListEl = document.getElementById('gradient-list');
 const emptyStateEl = document.getElementById('empty-state');
+const masterFadeInput = document.getElementById('master-fade-width');
+const masterFadeValue = document.getElementById('master-fade-value');
 const imageSizeSelect = document.getElementById('image-size');
-const minStripeWidthSelect = document.getElementById('min-stripe-width');
+const gridXInput = document.getElementById('grid-x');
+const gridYInput = document.getElementById('grid-y');
 const addGradientBtn = document.getElementById('add-gradient');
 const downloadBtn = document.getElementById('download');
 
@@ -93,6 +99,20 @@ const clearConfirmDialog = document.getElementById('clear-confirm-dialog');
 const clearConfirmForm = document.getElementById('clear-confirm-form');
 const clearConfirmMessage = document.getElementById('clear-confirm-message');
 const clearConfirmCancelBtn = document.getElementById('clear-confirm-cancel');
+
+
+const importModeTabs = document.getElementById('import-mode-tabs');
+const importTabPalette = document.getElementById('import-tab-palette');
+const importTabRecipe = document.getElementById('import-tab-recipe');
+const importRecipeBrowseBtn = document.getElementById('import-recipe-browse-btn');
+const importRecipeFileInput = document.getElementById('import-recipe-file-input');
+const importRecipePreview = document.getElementById('import-recipe-preview');
+const importRecipeErrorEl = document.getElementById('import-recipe-error');
+const importRecipeUseAnalyzeBtn = document.getElementById('import-recipe-use-analyze-btn');
+const importRecipeConfirmDialog = document.getElementById('import-recipe-confirm-dialog');
+const importRecipeConfirmForm = document.getElementById('import-recipe-confirm-form');
+const importRecipeConfirmMessage = document.getElementById('import-recipe-confirm-message');
+const importRecipeConfirmCancelBtn = document.getElementById('import-recipe-confirm-cancel');
 
 let renderQueued = false;
 
@@ -253,7 +273,23 @@ function renderGradientList() {
   }
   openMatchColorsBtn.disabled = state.gradients.length < 2;
   clearGradientsBtn.disabled = state.gradients.length === 0;
+  masterFadeInput.disabled = state.gradients.length === 0;
 }
+
+masterFadeInput.addEventListener('input', () => {
+  const value = parseFloat(masterFadeInput.value);
+  masterFadeValue.textContent = value.toFixed(2);
+  state.gradients.forEach((gradient) => {
+    gradient.fadeWidth = value;
+  });
+  gradientListEl.querySelectorAll('li').forEach((row) => {
+    const rowFadeInput = row.querySelector('.fade-width');
+    const rowFadeValue = row.querySelector('.fade-value');
+    if (rowFadeInput) rowFadeInput.value = String(value);
+    if (rowFadeValue) rowFadeValue.textContent = value.toFixed(2);
+  });
+  scheduleRender();
+});
 
 addGradientBtn.addEventListener('click', () => {
   state.gradients.push(createGradient());
@@ -266,15 +302,15 @@ imageSizeSelect.addEventListener('change', () => {
   scheduleRender();
 });
 
-minStripeWidthSelect.addEventListener('change', () => {
-  state.minStripeWidth = parseInt(minStripeWidthSelect.value, 10);
+function updateGridFromInputs() {
+  state.gridX = Math.max(1, parseInt(gridXInput.value, 10) || 1);
+  state.gridY = Math.max(1, parseInt(gridYInput.value, 10) || 1);
   scheduleRender();
-});
+}
+gridXInput.addEventListener('input', updateGridFromInputs);
+gridYInput.addEventListener('input', updateGridFromInputs);
 
-downloadBtn.addEventListener('click', () => {
-  composeTexture(fullResCanvas, state);
-  downloadCanvasAsPng(fullResCanvas, `gradient-texture-${state.imageSize}.png`);
-});
+downloadBtn.addEventListener('click', saveTexture);
 
 // eslint-disable-next-line no-undef -- Sortable is loaded globally via CDN script tag in index.html
 new Sortable(gradientListEl, {
@@ -394,6 +430,11 @@ const importPicker = createSwatchPicker({
 importPaletteBtn.addEventListener('click', () => {
   importTextarea.value = '';
   importPicker.reset();
+  importRecipeFileInput.value = '';
+  importRecipePreview.innerHTML = '';
+  clearRecipeError();
+  parsedRecipeData = null;
+  setImportMode('palette');
   importDialog.showModal();
   importTextarea.focus();
 });
@@ -414,8 +455,16 @@ importCancelBtn.addEventListener('click', () => {
   importDialog.close();
 });
 
-importForm.addEventListener('submit', (e) => {
+importForm.addEventListener('submit', async (e) => {
   e.preventDefault();
+
+  if (importMode === 'recipe') {
+    if (!parsedRecipeData) return;
+    const applied = await applyRecipeImport(parsedRecipeData);
+    if (applied) importDialog.close();
+    return;
+  }
+
   for (const { startColor, endColor } of importPicker.getIncludedColors()) {
     state.gradients.push(createGradient({ startColor, endColor }));
   }
@@ -493,7 +542,15 @@ analyzeImageCanvas.addEventListener('click', (e) => {
   analyzePicker.addHex(rgbToHex({ r, g, b }));
 });
 
-analyzeImageBtn.addEventListener('click', () => {
+async function loadFileIntoAnalyzeDialog(file) {
+  analyzePicker.reset();
+  loadedImageData = await loadImageIntoCanvas(file);
+  analyzeImagePreviewWrap.hidden = false;
+  analyzeModeTabs.hidden = false;
+  if (analyzeMode === 'auto') runExtraction();
+}
+
+function openAnalyzeDialog() {
   analyzeFileInput.value = '';
   loadedImageData = null;
   analyzeImagePreviewWrap.hidden = true;
@@ -501,16 +558,22 @@ analyzeImageBtn.addEventListener('click', () => {
   analyzePicker.reset();
   setAnalyzeMode('auto');
   analyzeDialog.showModal();
-});
+}
+
+// Entry point for "Use Create from Image instead" — reopens the dialog
+// already loaded with the file the Recipe import couldn't use, so the user
+// doesn't have to re-pick it.
+function openAnalyzeDialogWithFile(file) {
+  openAnalyzeDialog();
+  loadFileIntoAnalyzeDialog(file);
+}
+
+analyzeImageBtn.addEventListener('click', openAnalyzeDialog);
 
 analyzeFileInput.addEventListener('change', async () => {
   const file = analyzeFileInput.files[0];
   if (!file) return;
-  analyzePicker.reset();
-  loadedImageData = await loadImageIntoCanvas(file);
-  analyzeImagePreviewWrap.hidden = false;
-  analyzeModeTabs.hidden = false;
-  if (analyzeMode === 'auto') runExtraction();
+  await loadFileIntoAnalyzeDialog(file);
 });
 
 analyzeColorCount.addEventListener('input', () => {
@@ -756,8 +819,220 @@ clearConfirmForm.addEventListener('submit', (e) => {
   clearConfirmDialog.close();
 });
 
+// Generic Yes/No confirm, reused by the clear-all and import-recipe prompts:
+// shows dialog with message, resolves true on submit ("confirm" button) or
+// false on the cancel button.
+function askDialogConfirm({
+  dialog, form, cancelBtn, messageEl, message,
+}) {
+  if (messageEl) messageEl.textContent = message;
+  dialog.showModal();
+  return new Promise((resolve) => {
+    function cleanup() {
+      form.removeEventListener('submit', onSubmit);
+      cancelBtn.removeEventListener('click', onCancel);
+    }
+    function onSubmit(e) {
+      e.preventDefault();
+      cleanup();
+      dialog.close();
+      resolve(true);
+    }
+    function onCancel() {
+      cleanup();
+      dialog.close();
+      resolve(false);
+    }
+    form.addEventListener('submit', onSubmit);
+    cancelBtn.addEventListener('click', onCancel);
+  });
+}
+
+// --- Save as... — a single native save dialog via showSaveFilePicker, with
+// the recipe always embedded in the PNG. No app-level dialog: choosing a
+// filename and folder is already exactly what that native dialog does, so
+// adding our own step in front of it would just be friction.
+async function saveTexture() {
+  try {
+    composeTexture(fullResCanvas, state);
+    let blob = await canvasToBlob(fullResCanvas);
+    if (!blob) return;
+
+    const recipe = {
+      version: 1,
+      name: `gradient-texture-${state.imageSize}`,
+      imageSize: state.imageSize,
+      gridX: state.gridX,
+      gridY: state.gridY,
+      gradients: state.gradients.map((g) => ({
+        startColor: g.startColor,
+        endColor: g.endColor,
+        fadeWidth: g.fadeWidth,
+      })),
+    };
+    blob = await injectTextChunk(blob, RECIPE_PNG_KEYWORD, JSON.stringify(recipe));
+
+    await saveBlob(blob, `gradient-texture-${state.imageSize}.png`, {
+      description: 'PNG image',
+      accept: { 'image/png': ['.png'] },
+    });
+  } catch (err) {
+    console.error(err);
+    // eslint-disable-next-line no-alert -- one-off failure with no dedicated UI to surface into
+    alert(`Couldn't save the texture: ${err.message || err}`);
+  }
+}
+
+// --- Import dialog: "Palette" tab (existing paste-a-palette flow) and
+// "Recipe" tab (browse for a .json exported by "Save as..." to restore its
+// exact gradient list) -------------------------------------------------
+
+let importMode = 'palette';
+let parsedRecipeData = null;
+
+function updateImportConfirmState() {
+  if (importMode === 'recipe') {
+    importConfirmBtn.disabled = !parsedRecipeData;
+  } else {
+    importPicker.rerender();
+  }
+}
+
+function setImportMode(mode) {
+  importMode = mode;
+  Array.from(importModeTabs.children).forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.importTab === mode);
+  });
+  importTabPalette.hidden = mode !== 'palette';
+  importTabRecipe.hidden = mode !== 'recipe';
+  updateImportConfirmState();
+}
+
+Array.from(importModeTabs.children).forEach((btn) => {
+  btn.addEventListener('click', () => setImportMode(btn.dataset.importTab));
+});
+
+let pendingAnalyzeFallbackFile = null;
+
+function clearRecipeError() {
+  importRecipeErrorEl.hidden = true;
+  importRecipeErrorEl.textContent = '';
+  importRecipeUseAnalyzeBtn.hidden = true;
+  pendingAnalyzeFallbackFile = null;
+}
+
+function showRecipeError(message) {
+  importRecipeErrorEl.textContent = message;
+  importRecipeErrorEl.hidden = false;
+}
+
+function renderRecipePreview(data) {
+  importRecipePreview.innerHTML = '';
+  for (const g of data.gradients) {
+    const pair = document.createElement('div');
+    pair.className = 'import-swatch-pair';
+    const start = document.createElement('span');
+    start.className = 'import-swatch';
+    start.style.background = g.startColor;
+    const end = document.createElement('span');
+    end.className = 'import-swatch';
+    end.style.background = g.endColor;
+    pair.append(start, end);
+    importRecipePreview.appendChild(pair);
+  }
+}
+
+function parseRecipeText(text) {
+  clearRecipeError();
+  importRecipePreview.innerHTML = '';
+  parsedRecipeData = null;
+  if (text.trim()) {
+    try {
+      const data = JSON.parse(text);
+      if (!Array.isArray(data.gradients) || data.gradients.length === 0) {
+        showRecipeError("That doesn't look like a gradient recipe.");
+      } else {
+        parsedRecipeData = data;
+        renderRecipePreview(data);
+      }
+    } catch {
+      showRecipeError("That doesn't look like valid JSON.");
+    }
+  }
+  updateImportConfirmState();
+}
+
+importRecipeBrowseBtn.addEventListener('click', () => {
+  importRecipeFileInput.value = '';
+  importRecipeFileInput.click();
+});
+
+importRecipeFileInput.addEventListener('change', async () => {
+  const file = importRecipeFileInput.files[0];
+  if (!file) return;
+
+  clearRecipeError();
+  importRecipePreview.innerHTML = '';
+  parsedRecipeData = null;
+  const text = await extractTextChunk(file, RECIPE_PNG_KEYWORD);
+  if (text === null) {
+    showRecipeError('This PNG has no embedded recipe. You can still use "Create from Image" to pick colors from it manually.');
+    importRecipeUseAnalyzeBtn.hidden = false;
+    pendingAnalyzeFallbackFile = file;
+    updateImportConfirmState();
+    return;
+  }
+  parseRecipeText(text);
+});
+
+importRecipeUseAnalyzeBtn.addEventListener('click', () => {
+  const file = pendingAnalyzeFallbackFile;
+  if (!file) return;
+  importDialog.close();
+  openAnalyzeDialogWithFile(file);
+});
+
+async function applyRecipeImport(data) {
+  if (state.gradients.length > 0) {
+    const count = state.gradients.length;
+    const ok = await askDialogConfirm({
+      dialog: importRecipeConfirmDialog,
+      form: importRecipeConfirmForm,
+      cancelBtn: importRecipeConfirmCancelBtn,
+      messageEl: importRecipeConfirmMessage,
+      message: `This replaces your current ${count} gradient${count === 1 ? '' : 's'} with "${data.name || 'this recipe'}". This can't be undone.`,
+    });
+    if (!ok) return false;
+  }
+
+  state.gradients.length = 0;
+  for (const g of data.gradients) {
+    state.gradients.push(createGradient({
+      startColor: g.startColor,
+      endColor: g.endColor,
+      fadeWidth: g.fadeWidth,
+    }));
+  }
+  if (data.imageSize) {
+    state.imageSize = data.imageSize;
+    imageSizeSelect.value = String(data.imageSize);
+  }
+  if (data.gridX) {
+    state.gridX = data.gridX;
+    gridXInput.value = String(data.gridX);
+  }
+  if (data.gridY) {
+    state.gridY = data.gridY;
+    gridYInput.value = String(data.gridY);
+  }
+  renderGradientList();
+  scheduleRender();
+  return true;
+}
+
 imageSizeSelect.value = String(state.imageSize);
-minStripeWidthSelect.value = String(state.minStripeWidth);
+gridXInput.value = String(state.gridX);
+gridYInput.value = String(state.gridY);
 
 renderGradientList();
 scheduleRender();

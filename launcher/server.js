@@ -35,7 +35,12 @@ const server = http.createServer((req, res) => {
       return;
     }
     const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, { 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream' });
+    res.writeHead(200, {
+      'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
+      // This is a live dev server for actively-edited files — never let the
+      // browser cache a stale module/asset between edits.
+      'Cache-Control': 'no-store',
+    });
     res.end(data);
   });
 });

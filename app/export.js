@@ -1,4 +1,4 @@
-function canvasToBlob(canvas) {
+export function canvasToBlob(canvas) {
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 
@@ -13,32 +13,38 @@ function downloadViaAnchor(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-// downloadCanvasAsPng(canvas, filename) — opens a native "Save As" dialog
-// (via the File System Access API) so the user can pick a folder, falling
-// back to a plain browser download when that API isn't available.
-export async function downloadCanvasAsPng(canvas, filename) {
-  if (window.showSaveFilePicker) {
+function isFilePickerSupported() {
+  return typeof window.showSaveFilePicker === 'function';
+}
+
+// saveBlob(blob, filename, opts) — opens a native single-file "Save As"
+// dialog via the File System Access API, falling back to a plain browser
+// download when that API isn't available. Unlike directory access, a single
+// showSaveFilePicker() save implicitly grants write access to just that one
+// file as part of the same user action — no separate readwrite-permission
+// step needed, which is what makes this reliable where folder-based saving
+// wasn't.
+// Returns false if the user cancelled the picker, true otherwise.
+export async function saveBlob(blob, filename, { description, accept } = {}) {
+  if (isFilePickerSupported()) {
     let handle;
     try {
       handle = await window.showSaveFilePicker({
         suggestedName: filename,
-        types: [{ description: 'PNG image', accept: { 'image/png': ['.png'] } }],
+        types: description ? [{ description, accept }] : undefined,
       });
     } catch (err) {
-      if (err.name === 'AbortError') return; // user cancelled the picker
+      if (err.name === 'AbortError') return false; // user cancelled the picker
       handle = null;
     }
     if (handle) {
-      const blob = await canvasToBlob(canvas);
-      if (!blob) return;
       const writable = await handle.createWritable();
       await writable.write(blob);
       await writable.close();
-      return;
+      return true;
     }
   }
 
-  const blob = await canvasToBlob(canvas);
-  if (!blob) return;
   downloadViaAnchor(blob, filename);
+  return true;
 }

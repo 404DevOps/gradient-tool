@@ -19,16 +19,14 @@
         </select>
       </label>
       <label>
-        Min Gradient Width
-        <select id="min-stripe-width">
-          <option value="32">32</option>
-          <option value="64">64</option>
-          <option value="128" selected>128</option>
-          <option value="256">256</option>
-          <option value="512">512</option>
-        </select>
+        Dimensions X
+        <input type="number" id="grid-x" min="1" max="64" value="8" />
       </label>
-      <button id="import-palette" type="button">Import palette</button>
+      <label>
+        Dimensions Y
+        <input type="number" id="grid-y" min="1" max="64" value="4" />
+      </label>
+      <button id="import-palette" type="button">Import</button>
       <button id="analyze-image" type="button">Create from Image</button>
       <button id="open-library" type="button">Palette Library</button>
       <button id="open-match-colors" type="button" title="Add at least 2 gradients first" disabled>Match Colors</button>
@@ -50,6 +48,11 @@
       <div id="panel-divider" class="panel-divider" title="Drag to resize"></div>
 
       <section class="gradient-panel">
+        <div class="master-fade-row" id="master-fade-row">
+          <label for="master-fade-width">Fade width (all)</label>
+          <input type="range" id="master-fade-width" min="0" max="1" step="0.01" value="0.5" disabled />
+          <span id="master-fade-value">0.50</span>
+        </div>
         <ul id="gradient-list"></ul>
         <p id="empty-state" class="empty-state">No gradients yet — click "+ Add gradient" below to start.</p>
         <button id="add-gradient" type="button" class="add-gradient-btn">+ Add gradient</button>
@@ -61,28 +64,52 @@
 
   <dialog id="import-dialog">
     <form id="import-form" class="dialog-form" method="dialog">
-      <h2>Import color palette</h2>
-      <p class="import-hint">
-        Paste a palette export from coolors.co — CSV, hex list, JSON array/object,
-        extended array, or XML are all detected automatically. Each color becomes a
-        gradient from that color to a darker version of it.
-      </p>
-      <textarea id="import-textarea" rows="6" placeholder="c5e6a6, 9abb77, 7b825e, 9899a6"></textarea>
+      <h2>Import</h2>
 
-      <label class="import-darken-label">
-        Lighten amount for start color
-        <input type="range" id="import-lighten" min="0" max="90" value="20" />
-        <span id="import-lighten-value">20%</span>
-      </label>
+      <div class="segmented-tabs" id="import-mode-tabs">
+        <button type="button" data-import-tab="palette" class="active">Palette</button>
+        <button type="button" data-import-tab="recipe">Recipe</button>
+      </div>
 
-      <label class="import-darken-label">
-        Darken amount for end color
-        <input type="range" id="import-darken" min="0" max="90" value="40" />
-        <span id="import-darken-value">40%</span>
-      </label>
+      <div id="import-tab-palette">
+        <p class="import-hint">
+          Paste a palette export from coolors.co — CSV, hex list, JSON array/object,
+          extended array, or XML are all detected automatically. Each color becomes a
+          gradient from that color to a darker version of it.
+        </p>
+        <textarea id="import-textarea" rows="6" placeholder="c5e6a6, 9abb77, 7b825e, 9899a6"></textarea>
 
-      <p class="import-hint">Click a swatch pair below to exclude it from the import.</p>
-      <div id="import-preview" class="import-preview"></div>
+        <label class="import-darken-label">
+          Lighten amount for start color
+          <input type="range" id="import-lighten" min="0" max="90" value="20" />
+          <span id="import-lighten-value">20%</span>
+        </label>
+
+        <label class="import-darken-label">
+          Darken amount for end color
+          <input type="range" id="import-darken" min="0" max="90" value="40" />
+          <span id="import-darken-value">40%</span>
+        </label>
+
+        <p class="import-hint">Click a swatch pair below to exclude it from the import.</p>
+        <div id="import-preview" class="import-preview"></div>
+      </div>
+
+      <div id="import-tab-recipe" hidden>
+        <p class="import-hint">
+          Browse for a PNG exported from "Save as..." to load its exact gradient list,
+          image size, and dimensions. This replaces your current gradients.
+        </p>
+
+        <div class="import-actions recipe-browse-row">
+          <button type="button" id="import-recipe-browse-btn" class="dialog-cancel-btn">Browse file...</button>
+          <input type="file" id="import-recipe-file-input" accept="image/png" hidden />
+        </div>
+
+        <div id="import-recipe-preview" class="import-preview"></div>
+        <p id="import-recipe-error" class="project-error" hidden></p>
+        <button type="button" id="import-recipe-use-analyze-btn" class="dialog-cancel-btn" hidden>Use Create from Image instead</button>
+      </div>
 
       <div class="import-actions">
         <button type="button" id="import-cancel" class="dialog-cancel-btn">Cancel</button>
@@ -116,7 +143,7 @@
 
       <div class="import-darken-label" id="analyze-color-count-row">
         <label for="analyze-color-count">Number of colors</label>
-        <input type="range" id="analyze-color-count" min="2" max="10" value="5" />
+        <input type="range" id="analyze-color-count" min="2" max="32" value="5" />
         <span id="analyze-color-count-value">5</span>
         <button type="button" id="analyze-regenerate" class="regenerate-btn">Regenerate</button>
       </div>
@@ -240,6 +267,17 @@
       <div class="import-actions">
         <button type="button" id="clear-confirm-cancel" class="dialog-cancel-btn">Cancel</button>
         <button type="submit" id="clear-confirm-ok" class="clear-btn dialog-confirm-btn">Clear All</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="import-recipe-confirm-dialog">
+    <form id="import-recipe-confirm-form" class="dialog-form" method="dialog">
+      <h2>Import this recipe?</h2>
+      <p class="import-hint" id="import-recipe-confirm-message"></p>
+      <div class="import-actions">
+        <button type="button" id="import-recipe-confirm-cancel" class="dialog-cancel-btn">Cancel</button>
+        <button type="submit" id="import-recipe-confirm-ok" class="dialog-confirm-btn">Import</button>
       </div>
     </form>
   </dialog>
