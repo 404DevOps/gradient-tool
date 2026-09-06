@@ -621,7 +621,7 @@ dialog#import-recipe-confirm-dialog::backdrop {
 
 .match-preview-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
 }
 
@@ -630,16 +630,17 @@ dialog#import-recipe-confirm-dialog::backdrop {
   width: 56px;
   font-size: 12px;
   color: #aaa;
+  padding-top: 6px;
 }
 
 .match-swatch-row {
   flex: 1;
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(var(--match-cols, 8), 1fr);
   gap: 3px;
 }
 
 .match-pair {
-  flex: 1;
   display: flex;
   height: 32px;
   border-radius: 4px;
@@ -703,6 +704,13 @@ dialog#import-recipe-confirm-dialog::backdrop {
 .analyze-image-preview-wrap {
   display: flex;
   justify-content: center;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: box-shadow 0.15s;
+}
+
+.analyze-image-preview-wrap.drag-over {
+  box-shadow: 0 0 0 2px #4a7dfc;
 }
 
 #analyze-image-canvas {
@@ -718,16 +726,24 @@ dialog#import-recipe-confirm-dialog::backdrop {
   cursor: crosshair;
 }
 
-#analyze-file-input {
-  color: #ccc;
-  font-size: 12px;
-}
-
 .import-preview {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   min-height: 24px;
+}
+
+#import-recipe-preview {
+  cursor: pointer;
+  padding: 10px;
+  border: 2px dashed transparent;
+  border-radius: 8px;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+#import-recipe-preview.drag-over {
+  border-color: #4a7dfc;
+  background: rgba(74, 125, 252, 0.08);
 }
 
 .import-swatch-pair {
@@ -797,8 +813,37 @@ dialog#import-recipe-confirm-dialog::backdrop {
   gap: 8px;
 }
 
-.import-actions.recipe-browse-row {
-  justify-content: flex-start;
+.texture-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px 16px;
+  border: 2px dashed #444;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.texture-dropzone:hover,
+.texture-dropzone:focus-visible {
+  border-color: #4a7dfc;
+  outline: none;
+}
+
+.texture-dropzone.drag-over {
+  border-color: #4a7dfc;
+  background: rgba(74, 125, 252, 0.08);
+}
+
+.texture-dropzone-text {
+  color: #aaa;
+  font-size: 13px;
+}
+
+.texture-dropzone-browse {
+  color: #6c9dff;
+  text-decoration: underline;
 }
 
 .import-actions button {

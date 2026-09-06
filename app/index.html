@@ -27,7 +27,7 @@
         <input type="number" id="grid-y" min="1" max="64" value="4" />
       </label>
       <button id="import-palette" type="button">Import</button>
-      <button id="analyze-image" type="button">Create from Image</button>
+      <button id="analyze-image" type="button">Palette from Image</button>
       <button id="open-library" type="button">Palette Library</button>
       <button id="open-match-colors" type="button" title="Add at least 2 gradients first" disabled>Match Colors</button>
       <button id="clear-gradients" type="button" class="clear-btn" disabled>Clear All</button>
@@ -67,11 +67,27 @@
       <h2>Import</h2>
 
       <div class="segmented-tabs" id="import-mode-tabs">
-        <button type="button" data-import-tab="palette" class="active">Palette</button>
-        <button type="button" data-import-tab="recipe">Recipe</button>
+        <button type="button" data-import-tab="texture" class="active">Texture</button>
+        <button type="button" data-import-tab="palette">Palette</button>
       </div>
 
-      <div id="import-tab-palette">
+      <div id="import-tab-texture">
+        <p class="import-hint">
+          Drag in a PNG exported from "Save as...", or browse for one, to load its exact
+          gradient list, image size, and dimensions. This replaces your current gradients.
+        </p>
+
+        <div id="import-recipe-dropzone" class="texture-dropzone" tabindex="0" role="button">
+          <p class="texture-dropzone-text">Drag a PNG here, or <span class="texture-dropzone-browse">browse file...</span></p>
+          <input type="file" id="import-recipe-file-input" accept="image/png" hidden />
+        </div>
+
+        <div id="import-recipe-preview" class="import-preview" hidden tabindex="0" role="button"></div>
+        <p id="import-recipe-error" class="project-error" hidden></p>
+        <button type="button" id="import-recipe-use-analyze-btn" class="dialog-cancel-btn" hidden>Use Palette from Image instead</button>
+      </div>
+
+      <div id="import-tab-palette" hidden>
         <p class="import-hint">
           Paste a palette export from coolors.co — CSV, hex list, JSON array/object,
           extended array, or XML are all detected automatically. Each color becomes a
@@ -95,22 +111,6 @@
         <div id="import-preview" class="import-preview"></div>
       </div>
 
-      <div id="import-tab-recipe" hidden>
-        <p class="import-hint">
-          Browse for a PNG exported from "Save as..." to load its exact gradient list,
-          image size, and dimensions. This replaces your current gradients.
-        </p>
-
-        <div class="import-actions recipe-browse-row">
-          <button type="button" id="import-recipe-browse-btn" class="dialog-cancel-btn">Browse file...</button>
-          <input type="file" id="import-recipe-file-input" accept="image/png" hidden />
-        </div>
-
-        <div id="import-recipe-preview" class="import-preview"></div>
-        <p id="import-recipe-error" class="project-error" hidden></p>
-        <button type="button" id="import-recipe-use-analyze-btn" class="dialog-cancel-btn" hidden>Use Create from Image instead</button>
-      </div>
-
       <div class="import-actions">
         <button type="button" id="import-cancel" class="dialog-cancel-btn">Cancel</button>
         <button type="submit" id="import-confirm" class="dialog-confirm-btn" disabled>Import</button>
@@ -126,7 +126,10 @@
         low-poly version of it) or click specific spots to pick colors yourself.
       </p>
 
-      <input type="file" id="analyze-file-input" accept="image/*" />
+      <div id="analyze-dropzone" class="texture-dropzone" tabindex="0" role="button">
+        <p class="texture-dropzone-text">Drag an image here, or <span class="texture-dropzone-browse">browse file...</span></p>
+        <input type="file" id="analyze-file-input" accept="image/*" hidden />
+      </div>
 
       <div id="analyze-image-preview-wrap" class="analyze-image-preview-wrap" hidden>
         <canvas id="analyze-image-canvas"></canvas>
@@ -273,7 +276,7 @@
 
   <dialog id="import-recipe-confirm-dialog">
     <form id="import-recipe-confirm-form" class="dialog-form" method="dialog">
-      <h2>Import this recipe?</h2>
+      <h2>Import this texture?</h2>
       <p class="import-hint" id="import-recipe-confirm-message"></p>
       <div class="import-actions">
         <button type="button" id="import-recipe-confirm-cancel" class="dialog-cancel-btn">Cancel</button>

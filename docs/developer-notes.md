@@ -48,6 +48,22 @@ up to the project root, overwriting the old ones.
 building an exe — useful for testing changes in the standalone window without a full
 rebuild each time.
 
+## How it works
+
+- **Layout is a fixed grid.** `layoutStripes(count, imageSize, gridX, gridY)` in `app/layout.js`
+  computes cell positions from `imageSize`/`gridX`/`gridY` alone — never from `count`. That's
+  deliberate: the same dimensions always produce the same stripe geometry regardless of how many
+  gradients are actually defined, so swapping colors and re-exporting needs no UV/material changes
+  in Blender. See `docs/gradient-texture-tool-spec.md` for the exact algorithm.
+- **The recipe lives inside the PNG.** "Save as..." embeds a JSON payload (`{version, name,
+  imageSize, gridX, gridY, gradients}`) into a standard PNG `tEXt` chunk (keyword
+  `gradient-recipe`, see `app/pngMetadata.js`) — no sidecar file. Any other PNG viewer just
+  ignores that chunk. Importing a texture reads it back out to recreate the gradient list exactly.
+- **Palette-from-image de-duplicates by color distance.** `extractDominantColors` in
+  `app/imageAnalysis.js` runs k-means, then drops clusters that fall within a minimum RGB distance
+  of an already-kept, more dominant color. That minimum shrinks as you ask for more colors, so a
+  high color count doesn't just export a wall of near-identical shades.
+
 ## First-time setup (already done, for reference)
 
 `desktop-app/` needs its dependencies installed once:

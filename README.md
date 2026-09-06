@@ -19,42 +19,26 @@ and fades, and export a PNG sized and laid out exactly how you need it.
 
 ## Features
 
-- **Fixed grid layout** — gradients are arranged into a grid sized by texture size and your
-  chosen dimensions (columns × rows), independent of how many gradients you've actually defined.
-  That means swapping colors in an existing set and re-exporting always reproduces the exact same
-  stripe geometry — no UV/material changes needed on the Blender side for a recolor.
-- **Per-gradient controls** — start/end color, fade width (anywhere from a hard edge to a smooth
-  blend), and drag-and-drop reordering. A master "fade width (all)" slider lets you set every
-  gradient's fade at once.
-- **Full color picker** — HSL and RGB modes with live-synced sliders, a clickable 2D color
-  square, a hue strip, and a hex field, all on every color swatch. Copy a gradient's start color
-  to its end color (or back) with one click.
-- **Import a palette** — paste any [coolors.co](https://coolors.co) export (CSV, hex list, JSON,
-  XML — auto-detected) and turn each color into a start → darker-shade gradient in one step, with
-  adjustable lighten/darken amounts and the ability to drop colors you don't want before importing.
-- **Palette Library** — 500 curated palettes, filterable by mood, ready to drop straight into your
-  gradient list.
-- **Generate from a photo** — upload any image and either auto-detect its dominant colors
-  (a "low-poly" palette extraction, up to 32 colors) or click specific spots on the image to
-  sample exact colors yourself. The auto-detect step automatically skips near-duplicate shades,
-  loosening how close colors are allowed to be as you ask for more of them.
-- **Match Colors** — nudge a set of gradients' start (and optionally end) colors so they read as a
-  cohesive palette: spread hues apart, even out saturation, and space out lightness for contrast.
-- **Live preview** — every edit re-renders instantly, at a resizable preview size.
-- **Save as... / reimport** — export a full-resolution PNG in a single native save dialog; the
-  exact gradient list, image size, and grid dimensions are embedded right in the PNG, so
-  re-importing that same file later recreates it exactly, with no extra file to keep track of.
+- **Gradient list** — any number of gradients, each with its own start/end color and fade,
+  drag-and-drop reordering, and a master slider to adjust every fade at once.
+- **Full color picker** — HSL and RGB modes, a 2D color square, a hue strip, and a hex field on
+  every swatch.
+- **Bring in colors from anywhere** — paste a palette from [coolors.co](https://coolors.co),
+  pick from a library of 500 curated palettes, or pull colors straight out of a photo.
+- **Match Colors** — nudge a set of gradients so they read as a cohesive palette in one click.
+- **Live preview** as you edit.
+- **Save as a PNG** — your exact gradient setup travels with the file, so reopening it later
+  picks up right where you left off.
 - Runs as a **standalone desktop app** or in **any browser** — same tool, either way.
 
 ## How to use it
 
-1. Click **+ Add gradient** (or import a palette / generate from an image) to build up a list of
-   gradients.
+1. Click **+ Add gradient** (or bring in colors from a palette, the library, or an image) to
+   build up a list of gradients.
 2. Adjust each one's start color, end color, and fade width until the preview looks right.
-3. Drag to reorder, and pick a texture size and grid dimensions (columns × rows) from the top bar.
-4. Hit **Save as...** to export the PNG. The exact gradient list, image size, and grid
-   dimensions are embedded in the PNG itself, so you can re-import that same file later
-   (Import → Recipe tab) to recreate it exactly — no separate file to keep track of.
+3. Drag to reorder, and pick a texture size and grid dimensions from the top bar.
+4. Hit **Save as...** to export the PNG — it can be reopened later (via Import) to recreate this
+   exact setup.
 5. In Blender, apply the PNG as your model's texture, then set each face's UVs to sample the
    stripe (and vertical position within it) you want for that face.
 
@@ -64,7 +48,7 @@ and fades, and export a PNG sized and laid out exactly how you need it.
 - **In your browser:** double-click `start-in-browser.bat`.
 
 Both launch the exact same app. See [Developer Notes](docs/developer-notes.md) for the project
-layout and how to rebuild the standalone app after making changes.
+layout, file formats, and how to rebuild the standalone app after making changes.
 
 ## Inspiration
 

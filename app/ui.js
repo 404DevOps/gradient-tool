@@ -12,6 +12,40 @@ import { harmonizeColors } from './harmonize.js';
 
 const RECIPE_PNG_KEYWORD = 'gradient-recipe';
 
+// wireDropTarget(el, fileInput, onFile, opts) — click or drag-and-drop on
+// `el` both feed a File to `onFile`. Clicking re-opens `fileInput`'s native
+// picker (cleared first so re-selecting the same file still fires change).
+// `canClick` (default: always) gates the click/keyboard path only — drag
+// and drop always work, since it never conflicts with other click behavior
+// the element might already have (e.g. manual color-picking on a canvas).
+function wireDropTarget(el, fileInput, onFile, { canClick = () => true } = {}) {
+  el.addEventListener('click', () => {
+    if (!canClick()) return;
+    fileInput.value = '';
+    fileInput.click();
+  });
+  el.addEventListener('keydown', (e) => {
+    if (!canClick()) return;
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    fileInput.value = '';
+    fileInput.click();
+  });
+  el.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    el.classList.add('drag-over');
+  });
+  el.addEventListener('dragleave', () => {
+    el.classList.remove('drag-over');
+  });
+  el.addEventListener('drop', (e) => {
+    e.preventDefault();
+    el.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) onFile(file);
+  });
+}
+
 const previewPanel = document.getElementById('preview-panel');
 const previewContainer = document.getElementById('preview-container');
 const previewCanvas = document.getElementById('preview-canvas');
@@ -45,6 +79,7 @@ const importConfirmBtn = document.getElementById('import-confirm');
 const analyzeImageBtn = document.getElementById('analyze-image');
 const analyzeDialog = document.getElementById('analyze-dialog');
 const analyzeForm = document.getElementById('analyze-form');
+const analyzeDropzone = document.getElementById('analyze-dropzone');
 const analyzeFileInput = document.getElementById('analyze-file-input');
 const analyzeImagePreviewWrap = document.getElementById('analyze-image-preview-wrap');
 const analyzeImageCanvas = document.getElementById('analyze-image-canvas');
@@ -103,8 +138,8 @@ const clearConfirmCancelBtn = document.getElementById('clear-confirm-cancel');
 
 const importModeTabs = document.getElementById('import-mode-tabs');
 const importTabPalette = document.getElementById('import-tab-palette');
-const importTabRecipe = document.getElementById('import-tab-recipe');
-const importRecipeBrowseBtn = document.getElementById('import-recipe-browse-btn');
+const importTabTexture = document.getElementById('import-tab-texture');
+const importRecipeDropzone = document.getElementById('import-recipe-dropzone');
 const importRecipeFileInput = document.getElementById('import-recipe-file-input');
 const importRecipePreview = document.getElementById('import-recipe-preview');
 const importRecipeErrorEl = document.getElementById('import-recipe-error');
@@ -434,9 +469,10 @@ importPaletteBtn.addEventListener('click', () => {
   importRecipePreview.innerHTML = '';
   clearRecipeError();
   parsedRecipeData = null;
-  setImportMode('palette');
+  updateRecipeDropzoneVisibility();
+  setImportMode('texture');
   importDialog.showModal();
-  importTextarea.focus();
+  importRecipeDropzone.focus();
 });
 
 importTextarea.addEventListener('input', () => {
@@ -458,7 +494,7 @@ importCancelBtn.addEventListener('click', () => {
 importForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  if (importMode === 'recipe') {
+  if (importMode === 'texture') {
     if (!parsedRecipeData) return;
     const applied = await applyRecipeImport(parsedRecipeData);
     if (applied) importDialog.close();
@@ -545,6 +581,7 @@ analyzeImageCanvas.addEventListener('click', (e) => {
 async function loadFileIntoAnalyzeDialog(file) {
   analyzePicker.reset();
   loadedImageData = await loadImageIntoCanvas(file);
+  analyzeDropzone.hidden = true;
   analyzeImagePreviewWrap.hidden = false;
   analyzeModeTabs.hidden = false;
   if (analyzeMode === 'auto') runExtraction();
@@ -553,6 +590,7 @@ async function loadFileIntoAnalyzeDialog(file) {
 function openAnalyzeDialog() {
   analyzeFileInput.value = '';
   loadedImageData = null;
+  analyzeDropzone.hidden = false;
   analyzeImagePreviewWrap.hidden = true;
   analyzeModeTabs.hidden = true;
   analyzePicker.reset();
@@ -560,8 +598,8 @@ function openAnalyzeDialog() {
   analyzeDialog.showModal();
 }
 
-// Entry point for "Use Create from Image instead" — reopens the dialog
-// already loaded with the file the Recipe import couldn't use, so the user
+// Entry point for "Use Palette from Image instead" — reopens the dialog
+// already loaded with the file the Texture import couldn't use, so the user
 // doesn't have to re-pick it.
 function openAnalyzeDialogWithFile(file) {
   openAnalyzeDialog();
@@ -569,6 +607,16 @@ function openAnalyzeDialogWithFile(file) {
 }
 
 analyzeImageBtn.addEventListener('click', openAnalyzeDialog);
+
+wireDropTarget(analyzeDropzone, analyzeFileInput, loadFileIntoAnalyzeDialog);
+
+// Once an image is loaded the dropzone is gone — the preview itself becomes
+// the target for swapping in a different image. Drag-and-drop always works;
+// clicking only re-opens the file picker outside "Pick manually" mode,
+// since there the same click instead samples a color under the cursor.
+wireDropTarget(analyzeImagePreviewWrap, analyzeFileInput, loadFileIntoAnalyzeDialog, {
+  canClick: () => analyzeMode !== 'manual',
+});
 
 analyzeFileInput.addEventListener('change', async () => {
   const file = analyzeFileInput.files[0];
@@ -728,6 +776,13 @@ function currentMatchAmounts() {
 let matchPreviewResult = null;
 
 function updateMatchPreview() {
+  // Wrap the preview rows at the same column count as the actual texture
+  // grid, so with a larger gradient count you see it laid out the way it
+  // will actually render, instead of every swatch squeezed into one row.
+  const cols = Math.max(1, state.gridX);
+  matchPreviewBefore.style.setProperty('--match-cols', cols);
+  matchPreviewAfter.style.setProperty('--match-cols', cols);
+
   const startColors = state.gradients.map((g) => g.startColor);
   const endColors = state.gradients.map((g) => g.endColor);
   matchPreviewResult = harmonizeColors(startColors, currentMatchAmounts());
@@ -883,15 +938,16 @@ async function saveTexture() {
   }
 }
 
-// --- Import dialog: "Palette" tab (existing paste-a-palette flow) and
-// "Recipe" tab (browse for a .json exported by "Save as..." to restore its
-// exact gradient list) -------------------------------------------------
+// --- Import dialog: "Texture" tab (browse/drop a PNG exported by "Save
+// as..." to restore its exact gradient list — shown first, since that's the
+// primary way people reload their own work) and "Palette" tab (the
+// paste-a-palette flow) ------------------------------------------------
 
-let importMode = 'palette';
+let importMode = 'texture';
 let parsedRecipeData = null;
 
 function updateImportConfirmState() {
-  if (importMode === 'recipe') {
+  if (importMode === 'texture') {
     importConfirmBtn.disabled = !parsedRecipeData;
   } else {
     importPicker.rerender();
@@ -904,7 +960,7 @@ function setImportMode(mode) {
     btn.classList.toggle('active', btn.dataset.importTab === mode);
   });
   importTabPalette.hidden = mode !== 'palette';
-  importTabRecipe.hidden = mode !== 'recipe';
+  importTabTexture.hidden = mode !== 'texture';
   updateImportConfirmState();
 }
 
@@ -942,6 +998,16 @@ function renderRecipePreview(data) {
   }
 }
 
+// Dropzone is shown until a texture successfully loads; after that, the
+// preview itself becomes the target for swapping in a different one (drag
+// or click), so the dropzone's big empty prompt doesn't stick around next
+// to an already-loaded result.
+function updateRecipeDropzoneVisibility() {
+  const hasTexture = !!parsedRecipeData;
+  importRecipeDropzone.hidden = hasTexture;
+  importRecipePreview.hidden = !hasTexture;
+}
+
 function parseRecipeText(text) {
   clearRecipeError();
   importRecipePreview.innerHTML = '';
@@ -959,16 +1025,11 @@ function parseRecipeText(text) {
       showRecipeError("That doesn't look like valid JSON.");
     }
   }
+  updateRecipeDropzoneVisibility();
   updateImportConfirmState();
 }
 
-importRecipeBrowseBtn.addEventListener('click', () => {
-  importRecipeFileInput.value = '';
-  importRecipeFileInput.click();
-});
-
-importRecipeFileInput.addEventListener('change', async () => {
-  const file = importRecipeFileInput.files[0];
+async function handleRecipeFile(file) {
   if (!file) return;
 
   clearRecipeError();
@@ -976,13 +1037,21 @@ importRecipeFileInput.addEventListener('change', async () => {
   parsedRecipeData = null;
   const text = await extractTextChunk(file, RECIPE_PNG_KEYWORD);
   if (text === null) {
-    showRecipeError('This PNG has no embedded recipe. You can still use "Create from Image" to pick colors from it manually.');
+    showRecipeError('This PNG has no embedded recipe. You can still use "Palette from Image" to pick colors from it manually.');
     importRecipeUseAnalyzeBtn.hidden = false;
     pendingAnalyzeFallbackFile = file;
+    updateRecipeDropzoneVisibility();
     updateImportConfirmState();
     return;
   }
   parseRecipeText(text);
+}
+
+wireDropTarget(importRecipeDropzone, importRecipeFileInput, handleRecipeFile);
+wireDropTarget(importRecipePreview, importRecipeFileInput, handleRecipeFile);
+
+importRecipeFileInput.addEventListener('change', () => {
+  handleRecipeFile(importRecipeFileInput.files[0]);
 });
 
 importRecipeUseAnalyzeBtn.addEventListener('click', () => {
